@@ -1,0 +1,115 @@
+# Parámetros específicos por circuito que no se pueden derivar de telemetría.
+#
+# v_max_drs_kmh:  velocidad punta con DRS según speed trap oficial FIA.
+#                 Si no se especifica, se usa el máximo de telemetría (fallback).
+#
+# r_min_m:        radio mínimo físico real del circuito (curva más cerrada).
+#                 Valores κ > 1/r_min son artefactos de np.gradient.
+#                 Default: 30 m.
+#
+# track_width_m:  anchura útil de pista (bordillo a bordillo).
+#                 d_max = track_width_m/2 - 0.5 m (margen de seguridad).
+#                 Default: 12 m.
+#
+# Los nombres deben coincidir con el argumento --circuit del script
+# (case-insensitive, espacios y guiones normalizados a _).
+
+circuits:
+  barcelona:
+    v_max_drs_kmh: 340
+    r_min_m: 30
+
+  bahrain:
+    v_max_drs_kmh: 332
+    r_min_m: 16
+
+  saudi_arabia:
+    v_max_drs_kmh: 350
+    r_min_m: 15
+
+  australia:
+    v_max_drs_kmh: 320
+    r_min_m: 20
+
+  japan:
+    v_max_drs_kmh: 315
+    r_min_m: 10
+    k_drag: 0.0012
+
+  china:
+    v_max_drs_kmh: 330
+    r_min_m: 12
+
+  miami:
+    v_max_drs_kmh: 330
+    r_min_m: 20
+
+  emilia_romagna:
+    v_max_drs_kmh: 315
+    r_min_m: 20
+
+  monaco:
+    v_max_drs_kmh: 295
+    r_min_m: 12
+    track_width_m: 9
+
+  canada:
+    v_max_drs_kmh: 330
+    r_min_m: 20
+
+  austria:
+    v_max_drs_kmh: 324
+    r_min_m: 17
+
+  great_britain:
+    v_max_drs_kmh: 320
+    r_min_m: 25
+
+  hungary:
+    v_max_drs_kmh: 305
+    r_min_m: 20
+
+  belgium:
+    v_max_drs_kmh: 355
+    r_min_m: 15
+
+  netherlands:
+    v_max_drs_kmh: 315
+    r_min_m: 20
+
+  italy:
+    v_max_drs_kmh: 365
+    r_min_m: 22
+
+  azerbaijan:
+    v_max_drs_kmh: 350
+    r_min_m: 20
+
+  singapore:
+    v_max_drs_kmh: 305
+    r_min_m: 15
+    track_width_m: 10
+
+  united_states:
+    v_max_drs_kmh: 335
+    r_min_m: 15
+
+  mexico:
+    v_max_drs_kmh: 360
+    r_min_m: 18
+
+  brazil:
+    v_max_drs_kmh: 330
+    r_min_m: 20
+
+  las_vegas:
+    v_max_drs_kmh: 355
+    r_min_m: 20
+
+  qatar:
+    v_max_drs_kmh: 325
+    r_min_m: 15
+
+  abu_dhabi:
+    v_max_drs_kmh: 335
+    r_min_m: 30
