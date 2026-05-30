@@ -17,7 +17,6 @@ import fastf1
 import numpy as np
 import pandas as pd
 from scipy.interpolate import splprep, splev
-from scipy.signal import savgol_filter
 
 ROOT = Path(__file__).parent.parent
 DATA = ROOT / "data"
@@ -125,25 +124,39 @@ def reconstruir(year: int, circuit: str, session_type: str = "Q", n_top: int = 5
         sys.exit(1)
 
     # Suavizar y remuestrear cada trazada a 2000 puntos
-    trazadas = []
-    for tel in telemetries:
-        xs, ys, _, _ = suavizar_trazada(
-            tel["X"].values / 10.0,
-            tel["Y"].values / 10.0,
-        )
-        trazadas.append((xs, ys))
+    trazadas = []  # (laptime_s, xs, ys)
+    for lap, tel in zip(top_laps, telemetries):
+        try:
+            xs, ys, _, _ = suavizar_trazada(
+                tel["X"].values / 10.0,
+                tel["Y"].values / 10.0,
+            )
+            trazadas.append((lap["LapTime"].total_seconds(), xs, ys))
+        except Exception as e:
+            print(f"  {tel['Driver'].iloc[0]}  suavizado descartado: {e}")
 
-    # Alinear con la pole como referencia
-    x_pole, y_pole = trazadas[0]
-    alineadas = [trazadas[0]]
-    for xs, ys in trazadas[1:]:
-        dist = np.sqrt((xs - x_pole[0]) ** 2 + (ys - y_pole[0]) ** 2)
+    if not trazadas:
+        print("ERROR: ninguna trazada válida")
+        sys.exit(1)
+
+    # Promedio ponderado por tiempo: pole=peso máximo, los demás decaen linealmente
+    # Suaviza ruido GPS sin distorsionar chicanes como el promedio uniforme
+    t_pole = trazadas[0][0]
+    n = len(trazadas)
+    pesos = np.array([1.0 - 0.6 * (t - t_pole) / t_pole * n for t, _, _ in trazadas])
+    pesos = np.clip(pesos, 0.1, 1.0)
+    pesos /= pesos.sum()
+
+    xs_pole, ys_pole = trazadas[0][1], trazadas[0][2]
+    alineadas = [(xs_pole, ys_pole)]
+    for _, xs, ys in trazadas[1:]:
+        dist = np.sqrt((xs - xs_pole[0]) ** 2 + (ys - ys_pole[0]) ** 2)
         offset = np.argmin(dist)
         alineadas.append((np.roll(xs, -offset), np.roll(ys, -offset)))
 
-    # Centro geométrico
-    x_centro = np.mean([t[0] for t in alineadas], axis=0)
-    y_centro = np.mean([t[1] for t in alineadas], axis=0)
+    x_centro = sum(p * xs for p, (xs, ys) in zip(pesos, alineadas))
+    y_centro = sum(p * ys for p, (xs, ys) in zip(pesos, alineadas))
+    print(f"Centerline: promedio ponderado ({n} trazadas, pesos {np.round(pesos, 2)})")
 
     # Re-splinear el centro para curvatura analítica
     _, _, tck_centro, u_centro = suavizar_trazada(x_centro, y_centro, s_factor=0.05)
@@ -157,7 +170,9 @@ def reconstruir(year: int, circuit: str, session_type: str = "Q", n_top: int = 5
     print(f"Curvatura máx: {np.abs(kappa).max():.5f}  (R_min: {1/np.abs(kappa).max():.1f} m)")
 
     slug = slugify(circuit)
-    out = DATA / f"circuito_{slug}_{year}.csv"
+    year_dir = DATA / str(year)
+    year_dir.mkdir(exist_ok=True)
+    out = year_dir / f"circuito_{slug}_{year}.csv"
     pd.DataFrame({"x": x_fin, "y": y_fin, "kappa": kappa, "dist": dist}).to_csv(
         out, index=False
     )

@@ -33,7 +33,7 @@ circuits:
 
   japan:
     v_max_drs_kmh: 315
-    r_min_m: 10
+    r_min_m: 16
     k_drag: 0.0012
 
   china:
@@ -79,11 +79,11 @@ circuits:
 
   italy:
     v_max_drs_kmh: 365
-    r_min_m: 22
+    r_min_m: 15
 
   azerbaijan:
     v_max_drs_kmh: 350
-    r_min_m: 20
+    r_min_m: 8
 
   singapore:
     v_max_drs_kmh: 305

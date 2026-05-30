@@ -123,7 +123,7 @@ def optimizar(year: int, circuit: str, session_type: str = "Q"):
     mu_target_offset  = float(cfg.get("mu_target_offset_s",   MU_TARGET_OFFSET))
     k_drag_override   = cfg.get("k_drag",                     None)
 
-    circuito_path = DATA / f"circuito_{slug}_{year}.csv"
+    circuito_path = DATA / str(year) / f"circuito_{slug}_{year}.csv"
     if not circuito_path.exists():
         raise FileNotFoundError(
             f"No encontrado: {circuito_path}\n"
@@ -135,7 +135,8 @@ def optimizar(year: int, circuit: str, session_type: str = "Q"):
     y_ref    = circuito["y"].values
     dist_ref = circuito["dist"].values
     N        = len(x_ref)
-    print(f"Circuito: {circuit} {year}  ({N} puntos, {dist_ref[-1]:.1f} m)")
+    N_CTRL   = int(np.clip(dist_ref[-1] / 55.0, 80, 150))
+    print(f"Circuito: {circuit} {year}  ({N} puntos, {dist_ref[-1]:.1f} m, N_CTRL={N_CTRL})")
 
     # ── Normales ──────────────────────────────────────────────────────────────
     dx = np.gradient(x_ref); dy = np.gradient(y_ref)
@@ -391,7 +392,9 @@ def optimizar(year: int, circuit: str, session_type: str = "Q"):
     print(f"  Tiempo cómputo: {t_de+t_bfgs:.0f}s  (DE: {t_de:.0f}s, L-BFGS-B: {t_bfgs:.0f}s)")
 
     # ── Guardar ───────────────────────────────────────────────────────────────
-    out = DATA / f"trayectoria_tiempo_optima_{slug}_{year}.csv"
+    year_dir = DATA / str(year)
+    year_dir.mkdir(exist_ok=True)
+    out = year_dir / f"trayectoria_tiempo_optima_{slug}_{year}.csv"
     pd.DataFrame({
         "x":                x_to,
         "y":                y_to,
