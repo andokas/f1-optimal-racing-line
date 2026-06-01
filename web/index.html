@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F1 Optimal Racing Line</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script src="https://unpkg.com/deck.gl@9.0.0/dist.min.js"></script>
+<script src="data.js"></script>
+<script src="circuits.js"></script>
+</head>
+<body>
+
+<!-- ══ VIEW 1: Year ══════════════════════════════════════════════════════════ -->
+<div class="view active" id="view-year">
+  <header>
+    <div class="logo"></div>
+    <h1>F1 Optimal Racing Line</h1>
+  </header>
+  <div class="body">
+    <h2>Select Season</h2>
+    <div class="year-grid" id="year-grid"></div>
+  </div>
+</div>
+
+<!-- ══ VIEW 2: Circuit selection ════════════════════════════════════════════ -->
+<div class="view" id="view-circuit">
+  <header>
+    <div class="logo"></div>
+    <h1>F1 Optimal Racing Line</h1>
+    <span id="sel-season-label" style="color:var(--muted);font-size:0.85rem;margin-left:12px;letter-spacing:0.1em;"></span>
+    <button class="back-btn" onclick="showView('view-year')">← Seasons</button>
+  </header>
+  <div class="body">
+    <div class="flag-strip-wrapper">
+      <div class="flag-strip" id="flag-strip"></div>
+    </div>
+    <div class="circuit-stage">
+      <button class="nav-arrow" id="nav-prev">‹</button>
+      <div id="circuit-preview-container">
+        <div class="circuit-preview" id="circuit-preview"></div>
+      </div>
+      <button class="nav-arrow" id="nav-next">›</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ VIEW 3: Dashboard ═════════════════════════════════════════════════════-->
+<div class="view" id="view-dash">
+  <header>
+    <div class="logo"></div>
+    <h1 id="dash-title">F1 Optimal Racing Line</h1>
+    <button class="back-btn" onclick="showView('view-circuit')">← Circuits</button>
+  </header>
+  <div class="body">
+    <div class="dash-main">
+      <div class="stats-bar">
+        <div class="stat"><div class="val" id="stat-length">—</div><div class="lbl">Track Length</div></div>
+        <div class="stat"><div class="val" id="stat-vmin">—</div><div class="lbl">Min Speed</div></div>
+        <div class="stat"><div class="val" id="stat-vmean">—</div><div class="lbl">Avg Speed</div></div>
+        <div class="stat"><div class="val" id="stat-vmax">—</div><div class="lbl">Max Speed</div></div>
+        <div class="stat"><div class="val" id="stat-gain">—</div><div class="lbl">Diff vs Pole</div></div>
+      </div>
+      <div class="dash-panels">
+        <div class="map-panel">
+          <div class="panel-title">Racing Line — <strong>Optimal</strong> vs Reference &nbsp;·&nbsp; colored by speed</div>
+          <div id="map-container"></div>
+        </div>
+        <div class="resizer" id="resizer"></div>
+        <div class="charts-row">
+          <div class="chart-panel">
+            <div class="panel-title">Speed Profile — <strong>Optimal</strong> vs Pole</div>
+            <div id="chart-speed" style="height:var(--charts-h,260px);"></div>
+          </div>
+          <div class="chart-panel">
+            <div class="panel-title">Lateral Displacement vs Reference</div>
+            <div id="chart-desp" style="height:var(--charts-h,260px);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>

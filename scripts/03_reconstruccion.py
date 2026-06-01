@@ -141,10 +141,9 @@ def reconstruir(year: int, circuit: str, session_type: str = "Q", n_top: int = 5
 
     # Promedio ponderado por tiempo: pole=peso máximo, los demás decaen linealmente
     # Suaviza ruido GPS sin distorsionar chicanes como el promedio uniforme
-    t_pole = trazadas[0][0]
     n = len(trazadas)
-    pesos = np.array([1.0 - 0.6 * (t - t_pole) / t_pole * n for t, _, _ in trazadas])
-    pesos = np.clip(pesos, 0.1, 1.0)
+    # Decaimiento por posición: pole=1.0, cada puesto siguiente multiplica por 0.6
+    pesos = np.array([0.6 ** i for i in range(n)])
     pesos /= pesos.sum()
 
     xs_pole, ys_pole = trazadas[0][1], trazadas[0][2]
