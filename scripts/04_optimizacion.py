@@ -286,9 +286,15 @@ def optimizar(year: int, circuit: str, session_type: str = "Q"):
     a_obs  = np.diff(v_tel**2) / (2 * ds_tel)
     v_mid  = (v_tel[:-1] + v_tel[1:]) / 2
     frenada = (thr_tel[:-1] < 5) & (brk_tel[:-1] > 0.8) & (v_tel[:-1] > 50)
-    V_POWER_LIM = 61.0   # ~220 km/h: por encima la potencia limita, no el grip
+    v_drs_activo = v_tel[:-1][drs_tel[:-1] >= 10]
+    if len(v_drs_activo) > 10:
+        V_POWER_LIM = float(np.percentile(v_drs_activo, 40))
+    else:
+        V_POWER_LIM = 61.0
+    print(f"  V_POWER_LIM adaptativo: {V_POWER_LIM*3.6:.1f} km/h")
     accel_drs = ((thr_tel[:-1] > 95) & (drs_tel[:-1] >= 10)
-                 & (v_tel[:-1] > 50) & (v_tel[:-1] < V_POWER_LIM))
+                 & (v_tel[:-1] > 50) & (v_tel[:-1] < V_POWER_LIM)
+                 & (a_obs > 0))
 
     if k_drag_override is not None:
         k_drag = float(k_drag_override)
@@ -312,6 +318,8 @@ def optimizar(year: int, circuit: str, session_type: str = "Q"):
             muestras = np.concatenate([muestras_fren, muestras_acel])
             if len(muestras) > 3:
                 k_drag = float(np.clip(np.median(muestras), 0.0006, 0.0020))
+            if it == 2:
+                print(f"  Muestras frenada: {len(muestras_fren)}  aceleración DRS: {len(muestras_acel)}")
 
         mu_est = _calibrar_mu(k_drag, k_downforce, kappa_max, N, N_CTRL, x_ref, y_ref,
                               nx, ny, dist_ref, dist_tel, drs_tel, drs_mask,

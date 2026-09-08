@@ -15,46 +15,46 @@
 # (case-insensitive, espacios y guiones normalizados a _).
 
 circuits:
-  barcelona:
+  australia:
+    v_max_drs_kmh: 338
+    r_min_m: 20
+
+  china:
     v_max_drs_kmh: 340
-    r_min_m: 30
+    r_min_m: 12  
+
+  japan:
+    v_max_drs_kmh: 308
+    r_min_m: 16
+    k_drag: 0.0012  
 
   bahrain:
-    v_max_drs_kmh: 332
+    v_max_drs_kmh: 330
     r_min_m: 16
 
   saudi_arabia:
-    v_max_drs_kmh: 350
+    v_max_drs_kmh: 340
     r_min_m: 15
 
-  australia:
-    v_max_drs_kmh: 320
-    r_min_m: 20
-
-  japan:
-    v_max_drs_kmh: 315
-    r_min_m: 16
-    k_drag: 0.0012
-
-  china:
-    v_max_drs_kmh: 330
-    r_min_m: 12
-
   miami:
-    v_max_drs_kmh: 330
+    v_max_drs_kmh: 345
     r_min_m: 20
 
   emilia_romagna:
-    v_max_drs_kmh: 315
+    v_max_drs_kmh: 305
     r_min_m: 20
 
   monaco:
-    v_max_drs_kmh: 295
+    v_max_drs_kmh: 285
     r_min_m: 12
     track_width_m: 9
 
+  spain:
+    v_max_drs_kmh: 335
+    r_min_m: 30  
+
   canada:
-    v_max_drs_kmh: 330
+    v_max_drs_kmh: 340
     r_min_m: 20
 
   austria:
@@ -62,52 +62,52 @@ circuits:
     r_min_m: 17
 
   great_britain:
-    v_max_drs_kmh: 320
+    v_max_drs_kmh: 330
     r_min_m: 25
 
-  hungary:
-    v_max_drs_kmh: 305
-    r_min_m: 20
-
   belgium:
-    v_max_drs_kmh: 355
+    v_max_drs_kmh: 350
     r_min_m: 15
 
-  netherlands:
+  hungary:
     v_max_drs_kmh: 315
     r_min_m: 20
 
+  netherlands:
+    v_max_drs_kmh: 335
+    r_min_m: 20
+
   italy:
-    v_max_drs_kmh: 365
+    v_max_drs_kmh: 358
     r_min_m: 15
 
   azerbaijan:
-    v_max_drs_kmh: 350
+    v_max_drs_kmh: 345
     r_min_m: 8
 
   singapore:
-    v_max_drs_kmh: 305
+    v_max_drs_kmh: 320
     r_min_m: 15
     track_width_m: 10
 
   united_states:
-    v_max_drs_kmh: 335
+    v_max_drs_kmh: 330
     r_min_m: 15
 
   mexico:
-    v_max_drs_kmh: 360
+    v_max_drs_kmh: 355
     r_min_m: 18
 
   brazil:
-    v_max_drs_kmh: 330
+    v_max_drs_kmh: 340
     r_min_m: 20
 
   las_vegas:
-    v_max_drs_kmh: 355
+    v_max_drs_kmh: 358
     r_min_m: 20
 
   qatar:
-    v_max_drs_kmh: 325
+    v_max_drs_kmh: 330
     r_min_m: 15
 
   abu_dhabi:
