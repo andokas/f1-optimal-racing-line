@@ -280,13 +280,13 @@ def optimizar(year: int, circuit: str, session_type: str = "Q"):
     a_obs  = np.diff(v_tel**2) / (2 * ds_tel)
     v_mid  = (v_tel[:-1] + v_tel[1:]) / 2
     frenada = (thr_tel[:-1] < 5) & (brk_tel[:-1] > 0.8) & (v_tel[:-1] > 50)
-    v_drs_activo = v_tel[:-1][drs_tel[:-1] >= 10]
+    v_drs_activo = v_tel[:-1][drs_tel[:-1] >= 12]
     if len(v_drs_activo) > 10:
         V_POWER_LIM = float(np.percentile(v_drs_activo, 40))
     else:
         V_POWER_LIM = 61.0
     print(f"  V_POWER_LIM adaptativo: {V_POWER_LIM*3.6:.1f} km/h")
-    accel_drs = ((thr_tel[:-1] > 95) & (drs_tel[:-1] >= 10)
+    accel_drs = ((thr_tel[:-1] > 95) & (drs_tel[:-1] >= 12)
                  & (v_tel[:-1] > 50) & (v_tel[:-1] < V_POWER_LIM)
                  & (a_obs > 0))
 
@@ -499,14 +499,16 @@ def optimizar(year: int, circuit: str, session_type: str = "Q"):
     kappa_chk      = np.clip(savgol_filter(np.abs((dx_ver*ddy_ver - dy_ver*ddx_ver) / den_ver), 41, 3), 0.0, kappa_max)
     ds_chk         = np.maximum(np.sqrt(np.diff(x_ver)**2 + np.diff(y_ver)**2), 1e-6)
     drs_mask_orig  = drs_mask.copy()
-    drs_mask       = np.interp(np.linspace(0, 1, N_VER), np.linspace(0, 1, N), drs_mask_orig.astype(float)) >= 0.5
+    drs_mask_ver   = np.interp(np.linspace(0, 1, N_VER), np.linspace(0, 1, N), drs_mask_orig.astype(float)) >= 0.5
+    drs_mask       = drs_mask_ver
     v_lat_chk      = v_lateral_vec(kappa_chk, MU)
     v_chk          = forward_backward(v_lat_chk, ds_chk, kappa_chk, MU)
     drs_mask       = drs_mask_orig
     a_lat_chk      = v_chk**2 * kappa_chk
     dist_chk_full  = np.concatenate([[0], np.cumsum(ds_chk)])
     a_lon_signed   = np.gradient(v_chk**2, dist_chk_full) / 2.0
-    a_lon_tire     = a_lon_signed + k_drag * v_chk**2
+    k_drag_local   = np.where(drs_mask_ver, k_drag * DRS_FACTOR, k_drag)
+    a_lon_tire     = a_lon_signed + k_drag_local * v_chk**2
     a_lim_chk      = MU * G + k_downforce * v_chk**2
     carga         = np.sqrt((a_lat_chk / a_lim_chk)**2 + (a_lon_tire / a_lim_chk)**2)
     carga_max     = float(carga.max())
