@@ -41,9 +41,10 @@ CONFIG = ROOT / "config" / "circuitos.yaml"
 
 # ── Parámetros físicos fijos ──────────────────────────────────────────────────
 G            = 9.81
-K_DOWNFORCE_BAJO  = 0.0020   # circuitos lentos (<200 km/h media): Monaco, Singapore
-K_DOWNFORCE_MEDIO = 0.0028   # circuitos medios (200-240 km/h media)
-K_DOWNFORCE_ALTO  = 0.0032   # circuitos rápidos (>240 km/h media): Monza, Spa, Silverstone
+K_DOWNFORCE_LO    = 0.0018   # límite inferior (v_media ≤ 170 km/h)
+K_DOWNFORCE_HI    = 0.0035   # límite superior (v_media ≥ 260 km/h)
+V_DF_LO           = 170.0    # km/h — debajo de esto, k_downforce = K_DOWNFORCE_LO
+V_DF_HI           = 260.0    # km/h — encima de esto, k_downforce = K_DOWNFORCE_HI
 DRS_FACTOR   = 0.85
 V_MIN        = 8.0
 ANCHO_PISTA  = 12.0
@@ -261,25 +262,18 @@ def optimizar(year: int, circuit: str, session_type: str = "Q"):
     print(f"V_MAX_DRS: {V_MAX_DRS*3.6:.1f} km/h ({src})  |  V_MAX: {V_MAX*3.6:.1f} km/h")
     print(f"R_min: {r_min_m:.0f} m  (KAPPA_MAX={kappa_max:.5f})")
 
-    # ── k_downforce según velocidad media del circuito ───────────────────────
+    # ── k_downforce interpolado según velocidad media del circuito ───────────
     v_media_kmh = float(np.mean(v_tel) * 3.6)
-    if v_media_kmh < 200:
-        k_downforce = K_DOWNFORCE_BAJO
-        df_nivel = "bajo"
-    elif v_media_kmh > 225:
-        k_downforce = K_DOWNFORCE_ALTO
-        df_nivel = "alto"
-    else:
-        k_downforce = K_DOWNFORCE_MEDIO
-        df_nivel = "medio"
-    print(f"k_downforce: {k_downforce} ({df_nivel}, v_media={v_media_kmh:.1f} km/h)")
+    t_df = np.clip((v_media_kmh - V_DF_LO) / (V_DF_HI - V_DF_LO), 0.0, 1.0)
+    k_downforce = float(K_DOWNFORCE_LO + t_df * (K_DOWNFORCE_HI - K_DOWNFORCE_LO))
+    print(f"k_downforce: {k_downforce:.4f} (v_media={v_media_kmh:.1f} km/h, t={t_df:.2f})")
 
     # Máscara DRS
     drs_mask = np.zeros(N, dtype=np.bool_)
     dist_clip  = np.clip(dist_ref, dist_tel[0], dist_tel[-1])
     drs_interp = sp_interp1d(dist_tel, drs_tel, kind="nearest",
                               bounds_error=False, fill_value=0.0)(dist_clip)
-    drs_mask[:] = drs_interp >= 10
+    drs_mask[:] = drs_interp >= 12
     print(f"DRS: {drs_mask.sum()} puntos ({drs_mask.sum()/N*100:.1f}%)")
 
     # ── Co-calibración iterativa k_drag ↔ MU ─────────────────────────────────

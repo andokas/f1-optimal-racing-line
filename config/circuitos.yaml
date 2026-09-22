@@ -17,24 +17,24 @@
 circuits:
   australia:
     v_max_drs_kmh: 338
-    r_min_m: 20
+    r_min_m: 18
 
   china:
     v_max_drs_kmh: 340
-    r_min_m: 12  
+    r_min_m: 10
 
   japan:
     v_max_drs_kmh: 308
-    r_min_m: 16
-    k_drag: 0.0012  
+    r_min_m: 14
+    k_drag: 0.0012
 
   bahrain:
     v_max_drs_kmh: 330
-    r_min_m: 16
+    r_min_m: 12
 
   saudi_arabia:
     v_max_drs_kmh: 340
-    r_min_m: 15
+    r_min_m: 13
 
   miami:
     v_max_drs_kmh: 345
@@ -42,32 +42,32 @@ circuits:
 
   emilia_romagna:
     v_max_drs_kmh: 305
-    r_min_m: 20
+    r_min_m: 18
 
   monaco:
     v_max_drs_kmh: 285
-    r_min_m: 12
+    r_min_m: 8
     track_width_m: 9
 
   spain:
     v_max_drs_kmh: 335
-    r_min_m: 30  
+    r_min_m: 25
 
   canada:
     v_max_drs_kmh: 340
-    r_min_m: 20
+    r_min_m: 14
 
   austria:
     v_max_drs_kmh: 324
-    r_min_m: 17
+    r_min_m: 13
 
-  great_britain:
+  silverstone:
     v_max_drs_kmh: 330
-    r_min_m: 25
+    r_min_m: 20
 
   belgium:
     v_max_drs_kmh: 350
-    r_min_m: 15
+    r_min_m: 11
 
   hungary:
     v_max_drs_kmh: 315
@@ -75,11 +75,11 @@ circuits:
 
   netherlands:
     v_max_drs_kmh: 335
-    r_min_m: 20
+    r_min_m: 17
 
   italy:
     v_max_drs_kmh: 358
-    r_min_m: 15
+    r_min_m: 12
 
   azerbaijan:
     v_max_drs_kmh: 345
@@ -112,4 +112,4 @@ circuits:
 
   abu_dhabi:
     v_max_drs_kmh: 335
-    r_min_m: 30
+    r_min_m: 15
