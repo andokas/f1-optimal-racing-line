@@ -16,11 +16,36 @@ from pathlib import Path
 import fastf1
 import numpy as np
 import pandas as pd
+import yaml
 
-ROOT  = Path(__file__).parent.parent
-DATA  = ROOT / "data"
-WEB   = ROOT / "web"
-CACHE = ROOT / "cache"
+ROOT   = Path(__file__).parent.parent
+DATA   = ROOT / "data"
+WEB    = ROOT / "web"
+CACHE  = ROOT / "cache"
+CONFIG = ROOT / "config" / "circuitos.yaml"
+
+G = 9.81
+K_DF_LO, K_DF_HI = 0.0018, 0.0035
+V_DF_LO, V_DF_HI = 170.0, 260.0
+DRS_FACTOR = 0.85
+MARGEN = 0.5
+DEFAULT_ANCHO = 12.0
+DEFAULT_R_MIN = 30.0
+
+
+def _load_circuit_config(slug: str) -> dict:
+    if not CONFIG.exists():
+        return {}
+    with open(CONFIG) as f:
+        data = yaml.safe_load(f)
+    circuits = data.get("circuits", {})
+    if slug in circuits:
+        return circuits[slug]
+    slug_norm = slug.replace("_", "")
+    for key, val in circuits.items():
+        if key.replace("_", "") == slug_norm:
+            return val
+    return {}
 
 # Nombre FastF1 para cada slug (usado para cargar telemetría de la pole)
 FASTF1_NAME = {
@@ -50,33 +75,61 @@ FASTF1_NAME = {
     "abu_dhabi":      "Abu Dhabi",
 }
 
-# Nombre display, orden cronológico y año de datos efectivo
-CIRCUIT_META = {
-    "australia":      {"name": "Australia",     "order":  1},
-    "china":          {"name": "China",          "order":  2},
-    "japan":          {"name": "Japan",          "order":  3},
-    "bahrain":        {"name": "Bahrain",        "order":  4},
-    "saudi_arabia":   {"name": "Saudi Arabia",   "order":  5},
-    "miami":          {"name": "Miami",          "order":  6},
-    "emilia_romagna": {"name": "Emilia Romagna", "order":  7},
-    "monaco":         {"name": "Monaco",         "order":  8},
-    "spain":          {"name": "Spain",          "order":  9},
-    "canada":         {"name": "Canada",         "order": 10},
-    "austria":        {"name": "Austria",        "order": 11},
-    "silverstone":    {"name": "Silverstone",    "order": 12},
-    "belgium":        {"name": "Belgium",        "order": 13},
-    "hungary":        {"name": "Hungary",        "order": 14},
-    "netherlands":    {"name": "Netherlands",    "order": 15},
-    "italy":          {"name": "Italy",          "order": 16},
-    "azerbaijan":     {"name": "Azerbaijan",     "order": 17},
-    "singapore":      {"name": "Singapore",      "order": 18},
-    "united_states":  {"name": "United States",  "order": 19},
-    "mexico":         {"name": "Mexico",         "order": 20},
-    "brazil":         {"name": "Brazil",         "order": 21},
-    "las_vegas":      {"name": "Las Vegas",      "order": 22},
-    "qatar":          {"name": "Qatar",          "order": 23},
-    "abu_dhabi":      {"name": "Abu Dhabi",      "order": 24},
+# Nombre display (el orden se obtiene del calendario FastF1)
+CIRCUIT_NAMES = {
+    "australia":      "Australia",
+    "china":          "China",
+    "japan":          "Japan",
+    "bahrain":        "Bahrain",
+    "saudi_arabia":   "Saudi Arabia",
+    "miami":          "Miami",
+    "emilia_romagna": "Emilia Romagna",
+    "monaco":         "Monaco",
+    "spain":          "Spain",
+    "canada":         "Canada",
+    "austria":        "Austria",
+    "silverstone":    "Silverstone",
+    "belgium":        "Belgium",
+    "hungary":        "Hungary",
+    "netherlands":    "Netherlands",
+    "italy":          "Italy",
+    "azerbaijan":     "Azerbaijan",
+    "singapore":      "Singapore",
+    "united_states":  "United States",
+    "mexico":         "Mexico",
+    "brazil":         "Brazil",
+    "las_vegas":      "Las Vegas",
+    "qatar":          "Qatar",
+    "abu_dhabi":      "Abu Dhabi",
 }
+
+
+def _slugify(name: str) -> str:
+    return name.lower().replace(" ", "_").replace("-", "_")
+
+
+def _get_calendar_order(year: int) -> dict[str, int]:
+    """Devuelve {slug: round_number} desde el calendario FastF1."""
+    try:
+        fastf1.Cache.enable_cache(str(CACHE))
+        schedule = fastf1.get_event_schedule(year)
+        order = {}
+        for _, row in schedule.iterrows():
+            rn = int(row["RoundNumber"])
+            if rn == 0:
+                continue
+            event_name = str(row["EventName"])
+            slug = _slugify(row["Location"]) if "Location" in row else _slugify(event_name)
+            for our_slug, ff1_name in FASTF1_NAME.items():
+                if ff1_name.lower() in event_name.lower() or ff1_name.lower() in slug:
+                    order[our_slug] = rn
+                    break
+            else:
+                order[slug] = rn
+        return order
+    except Exception as e:
+        print(f"  ⚠  No se pudo obtener calendario {year}: {e}")
+        return {}
 
 # Circuitos que usan datos de un año distinto al de la temporada
 DATA_YEAR_OVERRIDE = {
@@ -86,6 +139,57 @@ DATA_YEAR_OVERRIDE = {
 
 def _round(arr, n):
     return [round(float(v), n) for v in arr]
+
+
+def _extract_model_params(slug: str, data_year: int, opt_dist, opt_v_ms, opt_kappa) -> dict | None:
+    """Extract model params and DRS mask from telemetry (lightweight calibration)."""
+    fastf1_name = FASTF1_NAME.get(slug)
+    if not fastf1_name:
+        return None
+    try:
+        cfg = _load_circuit_config(slug)
+        r_min_m = float(cfg.get("r_min_m", DEFAULT_R_MIN))
+        track_w = float(cfg.get("track_width_m", DEFAULT_ANCHO))
+        d_max = track_w / 2.0 - MARGEN
+
+        s = fastf1.get_session(data_year, fastf1_name, "Q")
+        s.load(telemetry=True, laps=True, weather=False, messages=False)
+        lap = s.laps.pick_fastest()
+        tel = lap.get_telemetry()
+        v_tel = tel["Speed"].values / 3.6
+        dist_tel = tel["Distance"].values
+        drs_tel = tel["DRS"].values.astype(float)
+
+        pole_time = float(lap["LapTime"].total_seconds())
+        v_media_kmh = float(np.mean(v_tel) * 3.6)
+        t_df = np.clip((v_media_kmh - V_DF_LO) / (V_DF_HI - V_DF_LO), 0.0, 1.0)
+        k_downforce = float(K_DF_LO + t_df * (K_DF_HI - K_DF_LO))
+
+        N = len(opt_dist)
+        dist_clip = np.clip(opt_dist, dist_tel[0], dist_tel[-1])
+        drs_interp = np.interp(dist_clip, dist_tel, drs_tel)
+        drs_mask = (drs_interp >= 12).astype(float)
+        drs_pct = round(float(drs_mask.sum() / N * 100), 1)
+
+        # Subsample DRS mask to ~200 points for web (boolean-ish)
+        step = max(1, N // 200)
+        drs_sub = [int(drs_mask[i]) for i in range(0, N, step)]
+        dist_sub = [round(float(opt_dist[i]), 1) for i in range(0, N, step)]
+
+        return {
+            "r_min_m": r_min_m,
+            "d_max": round(d_max, 1),
+            "track_width_m": track_w,
+            "k_downforce": round(k_downforce, 4),
+            "v_media_kmh": round(v_media_kmh, 1),
+            "drs_pct": drs_pct,
+            "drs_dist": dist_sub,
+            "drs_mask": drs_sub,
+            "pole_time": round(pole_time, 3),
+        }
+    except Exception as e:
+        print(f"    ⚠  params no disponibles: {e}")
+        return None
 
 
 def _cargar_telemetria_pole(slug: str, data_year: int) -> dict | None:
@@ -163,6 +267,8 @@ def exportar(year: int, out_path: Path):
     if not year_dir.exists():
         raise FileNotFoundError(f"No hay datos para {year} en {year_dir}")
 
+    calendar = _get_calendar_order(year)
+
     slugs = sorted(set(
         [p.stem.replace("circuito_", "").replace(f"_{year}", "")
          for p in year_dir.glob(f"circuito_*_{year}.csv")]
@@ -181,13 +287,14 @@ def exportar(year: int, out_path: Path):
             continue
 
         ref  = pd.read_csv(ref_path)
-        meta = CIRCUIT_META.get(slug, {"name": slug.replace("_", " ").title(), "order": 99})
+        display_name = CIRCUIT_NAMES.get(slug, slug.replace("_", " ").title())
+        race_order = calendar.get(slug, 99)
 
         note = f" (datos {data_year})" if data_year != year else ""
         entry = {
             "slug":      slug,
-            "name":      meta["name"],
-            "order":     meta["order"],
+            "name":      display_name,
+            "order":     race_order,
             "year":      year,
             "data_year": data_year,
             "ref": {
@@ -200,6 +307,9 @@ def exportar(year: int, out_path: Path):
         if opt_path.exists():
             opt   = pd.read_csv(opt_path)
             v_kmh = opt["velocidad"].values * 3.6
+            kappa_abs = np.abs(opt["kappa"].values)
+            radius = np.where(kappa_abs > 1e-6, 1.0 / kappa_abs, 9999.0)
+            step_k = max(1, len(kappa_abs) // 400)
             entry["opt"] = {
                 "x":        _round(opt["x"], 2),
                 "y":        _round(opt["y"], 2),
@@ -210,6 +320,8 @@ def exportar(year: int, out_path: Path):
                 "v_mean":   round(float(v_kmh.mean()), 1),
                 "length_m": round(float(opt["dist"].iloc[-1]), 1),
                 "n_desp":   _round(opt["n_desplazamiento"], 3),
+                "radius":   _round(np.clip(radius[::step_k], 0, 500), 1),
+                "radius_dist": _round(opt["dist"].values[::step_k], 1),
             }
             ds       = np.diff(opt["dist"].values)
             v_ms     = opt["velocidad"].values
@@ -225,36 +337,47 @@ def exportar(year: int, out_path: Path):
             else:
                 entry["pole_time"]    = None
                 entry["diff_vs_pole"] = None
+
+            params = _extract_model_params(slug, data_year, opt["dist"].values, v_ms, kappa_abs)
+            entry["model"] = params
+
             pole_str = f"  pole={pole_tel['driver']} {pole_tel['lap_time']:.3f}s  diff={entry['diff_vs_pole']:+.3f}s" if pole_tel else ""
-            print(f"  ✓  {meta['name']:20s}{note}  v=[{entry['opt']['v_min']:.0f}–{entry['opt']['v_max']:.0f}] km/h{pole_str}")
+            print(f"  ✓  {display_name:20s}{note}  v=[{entry['opt']['v_min']:.0f}–{entry['opt']['v_max']:.0f}] km/h{pole_str}")
         else:
             entry["opt"] = None
             entry["pole_tel"] = None
-            print(f"  ⚠  {meta['name']:20s}{note}  sin trayectoria óptima")
+            print(f"  ⚠  {display_name:20s}{note}  sin trayectoria óptima")
 
         circuits.append(entry)
 
     circuits.sort(key=lambda c: c["order"])
+    return circuits
+
+
+def exportar_multi(years: list[int], out_path: Path):
+    all_circuits = []
+    for year in years:
+        print(f"\n── Temporada {year} ──")
+        all_circuits.extend(exportar(year, out_path))
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    # Guardamos como JS para que funcione con doble clic sin servidor
     js_path = out_path.with_suffix(".js")
-    payload = json.dumps({"year": year, "circuits": circuits}, separators=(",", ":"))
+    payload = json.dumps({"years": sorted(years), "circuits": all_circuits}, separators=(",", ":"))
     with open(js_path, "w") as f:
         f.write(f"window.F1_DATA={payload};")
 
     size_mb = js_path.stat().st_size / 1e6
-    print(f"\n✅ {len(circuits)} circuitos → {js_path}  ({size_mb:.1f} MB)")
+    print(f"\n✅ {len(all_circuits)} circuitos ({len(years)} temporadas) → {js_path}  ({size_mb:.1f} MB)")
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--year", type=int, required=True)
+    parser.add_argument("--year", type=int, nargs="+", required=True)
     parser.add_argument("--out",  type=str, default=None)
     args = parser.parse_args()
     out_path = Path(args.out) if args.out else WEB / "data.json"
-    print(f"Exportando temporada {args.year} → {out_path}")
-    exportar(args.year, out_path)
+    print(f"Exportando temporadas {args.year} → {out_path}")
+    exportar_multi(args.year, out_path)
 
 
 if __name__ == "__main__":

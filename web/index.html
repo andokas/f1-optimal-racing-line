@@ -63,14 +63,18 @@
         <div class="stat"><div class="val" id="stat-vmean">—</div><div class="lbl">Avg Speed</div></div>
         <div class="stat"><div class="val" id="stat-vmax">—</div><div class="lbl">Max Speed</div></div>
         <div class="stat"><div class="val" id="stat-gain">—</div><div class="lbl">Diff vs Pole</div></div>
+        <div class="stat"><div class="val" id="stat-drs">—</div><div class="lbl">DRS %</div></div>
+        <div class="stat"><div class="val" id="stat-kdf">—</div><div class="lbl">k_downforce</div></div>
+        <div class="stat"><div class="val" id="stat-rmin">—</div><div class="lbl">R_min</div></div>
       </div>
       <div class="dash-panels">
         <div class="map-panel">
           <div class="panel-title">Racing Line — <strong>Optimal</strong> vs Reference &nbsp;·&nbsp; colored by speed</div>
           <div id="map-container"></div>
+          <div class="speed-legend" id="speed-legend"></div>
         </div>
         <div class="resizer" id="resizer"></div>
-        <div class="charts-row">
+        <div class="charts-row charts-3col">
           <div class="chart-panel">
             <div class="panel-title">Speed Profile — <strong>Optimal</strong> vs Pole</div>
             <div id="chart-speed" style="height:var(--charts-h,260px);"></div>
@@ -78,6 +82,10 @@
           <div class="chart-panel">
             <div class="panel-title">Lateral Displacement vs Reference</div>
             <div id="chart-desp" style="height:var(--charts-h,260px);"></div>
+          </div>
+          <div class="chart-panel">
+            <div class="panel-title">Turn Radius (1/κ)</div>
+            <div id="chart-radius" style="height:var(--charts-h,260px);"></div>
           </div>
         </div>
       </div>

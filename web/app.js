@@ -1,7 +1,7 @@
 const DATA     = window.F1_DATA;
-const C        = window.CIRCUITS;  // circuit metadata from circuits.js
+const C        = window.CIRCUITS;
 let deckInstance = null;
-let currentYear  = DATA.year;
+let currentYear  = (DATA.years || [DATA.year])[0];
 
 // ── View switching ────────────────────────────────────────────────────────────
 function showView(id) {
@@ -205,12 +205,24 @@ function openDashboard() {
   renderCircuit(selCircuit);
 }
 
-// ── Speed colorscale (global fixed scale) ─────────────────────────────────────
+// ── Speed colorscale (adaptive per circuit) ──────────────────────────────────
+let _vLo = 50, _vHi = 340;
 function speedColor(v) {
-  const t = Math.max(0, Math.min(1, (v - 50) / (340 - 50)));
+  const t = Math.max(0, Math.min(1, (v - _vLo) / (_vHi - _vLo)));
   const r = t < 0.5 ? 255 : Math.round(255 * (1 - (t-0.5)*2));
   const g = t < 0.5 ? Math.round(255 * t * 2) : 255;
   return [r, g, 40, 230];
+}
+function speedColorCSS(v) { const c = speedColor(v); return `rgb(${c[0]},${c[1]},${c[2]})`; }
+function updateSpeedScale(c) {
+  _vLo = Math.floor(c.opt.v_min / 10) * 10;
+  _vHi = Math.ceil(c.opt.v_max / 10) * 10;
+}
+function renderSpeedLegend() {
+  const el = document.getElementById('speed-legend');
+  const stops = [];
+  for (let i = 0; i <= 10; i++) stops.push(speedColorCSS(_vLo + (_vHi-_vLo)*i/10));
+  el.innerHTML = `${_vLo}<div class="grad" style="background:linear-gradient(to right,${stops.join(',')})"></div>${_vHi} km/h`;
 }
 
 // ── Deck.gl map ───────────────────────────────────────────────────────────────
@@ -281,6 +293,24 @@ function rollingAvg(arr, w) {
   });
 }
 
+function _drsShapes(c) {
+  if (!c.model || !c.model.drs_dist) return [];
+  const d = c.model.drs_dist, m = c.model.drs_mask;
+  const shapes = [];
+  let start = null;
+  for (let i = 0; i < d.length; i++) {
+    if (m[i] && start === null) start = d[i];
+    if (!m[i] && start !== null) {
+      shapes.push({ type:'rect', xref:'x', yref:'paper', x0:start, x1:d[i], y0:0, y1:1,
+        fillcolor:'rgba(0,180,255,0.06)', line:{width:0} });
+      start = null;
+    }
+  }
+  if (start !== null) shapes.push({ type:'rect', xref:'x', yref:'paper', x0:start, x1:d[d.length-1], y0:0, y1:1,
+    fillcolor:'rgba(0,180,255,0.06)', line:{width:0} });
+  return shapes;
+}
+
 function renderSpeedChart(c) {
   const traces = [{
     x: c.opt.dist, y: rollingAvg(c.opt.v_kmh, 5),
@@ -293,19 +323,30 @@ function renderSpeedChart(c) {
     name: `Pole · ${c.pole_tel.driver} ${c.pole_tel.lap_time}s`,
     line:{ color:'#4a9eff', width:1.2, dash:'dot' },
   });
-  Plotly.react('chart-speed', traces, LAYOUT('Speed (km/h)'), { responsive:true, displayModeBar:false });
+  const layout = { ...LAYOUT('Speed (km/h)'), shapes: _drsShapes(c) };
+  Plotly.react('chart-speed', traces, layout, { responsive:true, displayModeBar:false });
 }
 
 function renderDespChart(c) {
+  const dMax = (c.model && c.model.d_max) ? c.model.d_max : 5.5;
+  const xr = [c.opt.dist[0], c.opt.dist.at(-1)];
   Plotly.react('chart-desp', [{
     x: c.opt.dist, y: c.opt.n_desp,
     type:'scatter', mode:'lines', name:'Displacement',
     line:{ color:'#f0a500', width:1.2 },
     fill:'tozeroy', fillcolor:'rgba(240,165,0,0.06)',
   },{
-    x: [c.opt.dist[0], c.opt.dist.at(-1)], y: [0, 0],
+    x: xr, y: [0, 0],
     type:'scatter', mode:'lines',
     line:{ color:'#444', width:1, dash:'dot' }, showlegend:false,
+  },{
+    x: xr, y: [dMax, dMax],
+    type:'scatter', mode:'lines', name:`+d_max (${dMax}m)`,
+    line:{ color:'#e10600', width:0.8, dash:'dash' },
+  },{
+    x: xr, y: [-dMax, -dMax],
+    type:'scatter', mode:'lines', name:`-d_max`,
+    line:{ color:'#e10600', width:0.8, dash:'dash' }, showlegend:false,
   }], LAYOUT('Lateral offset (m)'), { responsive:true, displayModeBar:false });
 }
 
@@ -321,14 +362,48 @@ function renderStats(c) {
   } else {
     document.getElementById('stat-gain').textContent = '—';
   }
+  const m = c.model;
+  document.getElementById('stat-drs').textContent  = m ? m.drs_pct + '%' : '—';
+  document.getElementById('stat-kdf').textContent  = m ? m.k_downforce : '—';
+  document.getElementById('stat-rmin').textContent = m ? m.r_min_m + ' m' : '—';
 }
 
 function renderCircuit(c) {
   if (!c.opt) return;
+  updateSpeedScale(c);
   renderStats(c);
   renderMap(c);
+  renderSpeedLegend();
   renderSpeedChart(c);
   renderDespChart(c);
+  renderRadiusChart(c);
+}
+
+function renderRadiusChart(c) {
+  if (!c.opt.radius) { Plotly.purge('chart-radius'); return; }
+  const rMin = (c.model && c.model.r_min_m) ? c.model.r_min_m : null;
+  const traces = [{
+    x: c.opt.radius_dist, y: c.opt.radius,
+    type:'scatter', mode:'lines', name:'Radius',
+    line:{ color:'#00d2be', width:1.2 },
+    fill:'tozeroy', fillcolor:'rgba(0,210,190,0.05)',
+  }];
+  const shapes = [];
+  if (rMin) {
+    shapes.push({ type:'line', xref:'paper', x0:0, x1:1, yref:'y', y0:rMin, y1:rMin,
+      line:{ color:'#e10600', width:1, dash:'dash' } });
+    traces.push({
+      x: [c.opt.radius_dist[0]], y: [rMin],
+      type:'scatter', mode:'markers', name:`R_min (${rMin}m)`,
+      marker:{ size:0 }, line:{ color:'#e10600', dash:'dash' },
+    });
+  }
+  const layout = {
+    ...LAYOUT('Radius (m)'),
+    yaxis: { ...LAYOUT('Radius (m)').yaxis, range:[0, Math.min(200, Math.max(...c.opt.radius) * 1.1)] },
+    shapes,
+  };
+  Plotly.react('chart-radius', traces, layout, { responsive:true, displayModeBar:false });
 }
 
 // ── Resizer ───────────────────────────────────────────────────────────────────
@@ -348,8 +423,9 @@ document.addEventListener('mousemove', e => {
   const ch = Math.max(120, startChartH - dy);
   document.documentElement.style.setProperty('--map-h',    mh + 'px');
   document.documentElement.style.setProperty('--charts-h', ch + 'px');
-  Plotly.relayout('chart-speed', { height: ch });
-  Plotly.relayout('chart-desp',  { height: ch });
+  Plotly.relayout('chart-speed',  { height: ch });
+  Plotly.relayout('chart-desp',   { height: ch });
+  Plotly.relayout('chart-radius', { height: ch });
 });
 document.addEventListener('mouseup', () => {
   if (!dragging) return;
